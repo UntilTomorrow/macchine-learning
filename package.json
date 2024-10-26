@@ -1,0 +1,17 @@
+{
+  "name": "aibotq",
+  "version": "1.0.0",
+  "description": "Learning Machine",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Heru C",
+  "license": "ISC",
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "axios": "^1.7.7",
+    "nodemon": "^3.1.7",
+    "string-similarity": "^4.0.4"
+  }
+}
