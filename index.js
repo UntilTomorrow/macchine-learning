@@ -8,7 +8,6 @@ const model = "bert-large-uncased-whole-word-masking-finetuned-squad";
 
 function findanswerlearnjson(question) {
   const data = JSON.parse(fs.readFileSync("learn.json"));
-
   const questions = data.map((item) => item.question);
   const matches = stringSimilarity.findBestMatch(question, questions);
 
@@ -20,9 +19,17 @@ function findanswerlearnjson(question) {
   return null;
 }
 
-function createfromlearnjson() {
+function createContextForQuestion(question) {
   const data = JSON.parse(fs.readFileSync("learn.json"));
-  return data.map((item) => `${item.question}: ${item.answer}`).join(" ");
+  const relatedQnA = data.filter((item) => {
+    return stringSimilarity.compareTwoStrings(question, item.question) > 0.5;
+  });
+
+  const context = relatedQnA
+    .map((item) => `${item.question}: ${item.answer}`)
+    .join(" ");
+
+  return context || "jawaban tidak ditemukan";
 }
 
 async function answermodelai(question, context) {
@@ -52,11 +59,11 @@ async function getAnswer(question) {
   let answer = findanswerlearnjson(question);
 
   if (answer) {
-    console.log("Answer from learn.json:", answer);
+    console.log("learn.json:", answer);
   } else {
-    const context = createfromlearnjson();
+    const context = createContextForQuestion(question);
     answer = await answermodelai(question, context);
-    console.log("Answer from Hugging Face API:", answer);
+    console.log("Model.API:", answer);
   }
 }
 
