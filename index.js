@@ -1,76 +1,72 @@
-const axios = require("axios");
 const fs = require("fs");
 const readline = require("readline");
+const { exec } = require("child_process");
 const stringSimilarity = require("string-similarity");
 
-const API_TOKEN = "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";
-const model = "bert-large-uncased-whole-word-masking-finetuned-squad";
+function loadKnowledgeBase(filepath) {
+  try {
+    const data = JSON.parse(fs.readFileSync(filepath, "utf-8"));
+    console.log("Knowledge base loaded successfully.");
+    return data;
+  } catch (error) {
+    console.error("Error loading knowledge base:", error);
+    return [];
+  }
+}
 
-function findanswerlearnjson(question) {
-  const data = JSON.parse(fs.readFileSync("learn.json"));
+function findRelevantContext(question) {
+  const data = loadKnowledgeBase("learn.json");
   const questions = data.map((item) => item.question);
   const matches = stringSimilarity.findBestMatch(question, questions);
 
-  if (matches.bestMatch.rating >= 0.7) {
-    const bestMatchQuestion = matches.bestMatch.target;
-    const qna = data.find((item) => item.question === bestMatchQuestion);
-    return qna ? qna.answer : null;
+  const bestMatches = matches.ratings
+    .filter((match) => match.rating >= 0.5)
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 3);
+
+  if (bestMatches.length > 0) {
+    const context = bestMatches
+      .map((match) => {
+        const qna = data.find((item) => item.question === match.target);
+        return `${qna.question}: ${qna.answer}`;
+      })
+      .join("\n");
+
+    console.log(`Relevant context found for question: ${question}`);
+    return context;
   }
-  return null;
+
+  return "Informasi relevan tidak ditemukan di knowledge base, mohon maaf.";
 }
 
-function createContextForQuestion(question) {
-  const data = JSON.parse(fs.readFileSync("learn.json"));
-  const relatedQnA = data.filter((item) => {
-    return stringSimilarity.compareTwoStrings(question, item.question) > 0.5;
-  });
+function sendToLlamaWithContext(question, context) {
+  return new Promise((resolve, reject) => {
+    const prompt = `${context}${question}`;
 
-  const context = relatedQnA
-    .map((item) => `${item.question}: ${item.answer}`)
-    .join(" ");
+    console.log("Prompt yang dikirim ke Llama:", prompt);
 
-  return context || "jawaban tidak ditemukan";
-}
-
-async function answermodelai(question, context) {
-  try {
-    const response = await axios({
-      method: "post",
-      url: `https://api-inference.huggingface.co/models/${model}`,
-      headers: { Authorization: `Bearer ${API_TOKEN}` },
-      data: {
-        inputs: {
-          question: question,
-          context: context,
-        },
-      },
+    const modelName = "llama3.2:latest";
+    exec(`ollama run ${modelName} "${prompt}"`, (error, stdout, stderr) => {
+      if (error) {
+        reject(`Execution Error: ${stderr}`);
+      } else {
+        resolve(stdout.trim());
+      }
     });
-
-    return response.data.answer;
-  } catch (error) {
-    console.error(
-      "Error:",
-      error.response ? error.response.data : error.message
-    );
-  }
+  });
 }
 
 async function getAnswer(question) {
-  let answer = findanswerlearnjson(question);
-
-  if (answer) {
-    console.log("learn.json:", answer);
-  } else {
-    const context = createContextForQuestion(question);
-    answer = await answermodelai(question, context);
-    console.log("Model.API:", answer);
-  }
+  const context = findRelevantContext(question);
+  try {
+    const answer = await sendToLlamaWithContext(question, context);
+  } catch (error) {}
 }
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: "Ask a question> ",
+  prompt: "Tanyakan sesuatu> ",
 });
 
 rl.prompt();
@@ -80,10 +76,9 @@ rl.on("line", (line) => {
   if (question) {
     getAnswer(question);
   } else {
-    console.log("Please type a question.");
   }
   rl.prompt();
 }).on("close", () => {
-  console.log("Goodbye!");
+  console.log("Sampai jumpa!");
   process.exit(0);
 });
