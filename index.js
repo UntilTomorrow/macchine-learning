@@ -6,7 +6,6 @@ const stringSimilarity = require("string-similarity");
 function loadKnowledgeBase(filepath) {
   try {
     const data = JSON.parse(fs.readFileSync(filepath, "utf-8"));
-    console.log("Knowledge base loaded successfully.");
     return data;
   } catch (error) {
     console.error("Error loading knowledge base:", error);
@@ -32,7 +31,6 @@ function findRelevantContext(question) {
       })
       .join("\n");
 
-    console.log(`Relevant context found for question: ${question}`);
     return context;
   }
 
@@ -41,9 +39,9 @@ function findRelevantContext(question) {
 
 function sendToLlamaWithContext(question, context) {
   return new Promise((resolve, reject) => {
-    const prompt = `${context}${question}`;
+    const prompt = `${context}\n\n${question}`;
 
-    console.log("Prompt yang dikirim ke Llama:", prompt);
+    console.log(prompt);
 
     const modelName = "llama3.2:latest";
     exec(`ollama run ${modelName} "${prompt}"`, (error, stdout, stderr) => {
@@ -60,7 +58,10 @@ async function getAnswer(question) {
   const context = findRelevantContext(question);
   try {
     const answer = await sendToLlamaWithContext(question, context);
-  } catch (error) {}
+    console.log(answer);
+  } catch (error) {
+    console.error("Error fetching answer:", error);
+  }
 }
 
 const rl = readline.createInterface({
@@ -75,7 +76,6 @@ rl.on("line", (line) => {
   const question = line.trim();
   if (question) {
     getAnswer(question);
-  } else {
   }
   rl.prompt();
 }).on("close", () => {
